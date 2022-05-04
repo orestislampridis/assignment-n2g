@@ -9,12 +9,12 @@ use PhpAmqpLib\Message\AMQPMessage;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
-class ReceiveController
+class SubscribeController
 {
     /**
-     * @Route("/receive")
+     * @Route("/subscribe")
      */
-    public function receive(ManagerRegistry $doctrine): Response
+    public function subscribe(ManagerRegistry $doctrine): Response
     {
         $url = 'https://a831bqiv1d.execute-api.eu-west-1.amazonaws.com/dev/results';
         $sock = fopen($url, 'r');
@@ -24,7 +24,7 @@ class ReceiveController
         $content = json_decode($data, True);
 
         # Create body that will be sent to RabbitMQ
-        $body = $content['timestamp'] . '.' . $content['value'];
+        $body = $content['value'] . '.' . $content['timestamp'];
 
         # Convert from hexadecimal to decimal
         $num = gmp_init('0x' . $content['gatewayEui']);
@@ -49,15 +49,10 @@ class ReceiveController
 
         $channel = $connection->channel();
 
-        $channel->exchange_declare($_ENV['RABBITMQ_EXCHANGE'], 'direct', true, true, true);
+        $channel->exchange_declare($_ENV['RABBITMQ_EXCHANGE'], 'direct', true, true, false);
 
         # Create the queue if it doesnt already exist.
-        $channel->queue_declare(
-            $queue = $_ENV['RABBITMQ_QUEUE_NAME'],
-            $passive = true,
-            $durable = true,
-            $exclusive = true
-        );
+        $channel->queue_declare($_ENV['RABBITMQ_QUEUE_NAME'], true, true, true, false);
 
         $channel->queue_bind($_ENV['RABBITMQ_QUEUE_NAME'], $_ENV['RABBITMQ_EXCHANGE'], $routing_key);
 
